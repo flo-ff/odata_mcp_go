@@ -18,6 +18,17 @@ type SecurityConfig struct {
 	TLSCert            string // Path to TLS certificate
 	TLSKey             string // Path to TLS key
 	AllowAllInterfaces bool   // Explicit flag to allow 0.0.0.0/::
+
+	// TLSTerminatedUpstream declares that a trusted reverse proxy (e.g. the
+	// Cloud Foundry gorouter or an ingress) terminates TLS in front of this
+	// process. It satisfies the TLS requirement for non-loopback bindings but
+	// never the token requirement.
+	TLSTerminatedUpstream bool
+}
+
+// tlsSatisfied reports whether the TLS requirement for remote bindings is met.
+func (c SecurityConfig) tlsSatisfied() bool {
+	return c.TLSEnabled || c.TLSTerminatedUpstream
 }
 
 // ValidateHTTPSecurity validates security configuration for HTTP transport.
@@ -36,8 +47,8 @@ func ValidateHTTPSecurity(cfg SecurityConfig) error {
 		if cfg.Token == "" {
 			return fmt.Errorf("--mcp-token required when binding to all interfaces")
 		}
-		if !cfg.TLSEnabled {
-			return fmt.Errorf("--tls required when binding to all interfaces")
+		if !cfg.tlsSatisfied() {
+			return fmt.Errorf("--tls required (or --tls-terminated-upstream) when binding to all interfaces")
 		}
 		return nil
 	}
@@ -54,8 +65,8 @@ func ValidateHTTPSecurity(cfg SecurityConfig) error {
 	if cfg.Token == "" {
 		return fmt.Errorf("--mcp-token required for non-localhost binding")
 	}
-	if !cfg.TLSEnabled {
-		return fmt.Errorf("--tls required for non-localhost binding")
+	if !cfg.tlsSatisfied() {
+		return fmt.Errorf("--tls required (or --tls-terminated-upstream) for non-localhost binding")
 	}
 
 	return nil
@@ -117,4 +128,13 @@ func ValidateToken(provided, expected string) bool {
 		return true
 	}
 	return subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) == 1
+}
+
+// BearerToken extracts the token from an "Authorization: Bearer <token>" header value.
+func BearerToken(header string) string {
+	const prefix = "bearer "
+	if len(header) > len(prefix) && strings.EqualFold(header[:len(prefix)], prefix) {
+		return strings.TrimSpace(header[len(prefix):])
+	}
+	return ""
 }

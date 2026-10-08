@@ -20,7 +20,11 @@ type SSETransport struct {
 	clients  map[string]*sseClient
 	mu       sync.RWMutex
 	messages chan *clientMessage
+	auth     Authenticator
 }
+
+// SetAuthenticator installs request authentication; /health stays unauthenticated.
+func (t *SSETransport) SetAuthenticator(a Authenticator) { t.auth = a }
 
 type sseClient struct {
 	id      string
@@ -65,7 +69,7 @@ func (t *SSETransport) Start(ctx context.Context) error {
 
 	t.server = &http.Server{
 		Addr:    t.addr,
-		Handler: mux,
+		Handler: RequireAuth(mux, t.auth, "/health"),
 	}
 
 	// Start message processor

@@ -54,11 +54,21 @@ func (c *ODataClient) SetBasicAuth(username, password string) {
 	c.password = password
 }
 
-// SetInsecureSkipVerify disables TLS certificate verification for outgoing requests.
+// SetInsecureSkipVerify disables TLS certificate verification for outgoing
+// requests. It only affects the default transport; a transport installed via
+// SetTransport (e.g. the plain-HTTP connectivity proxy) is left untouched.
 func (c *ODataClient) SetInsecureSkipVerify() {
+	if c.httpClient.Transport != nil {
+		return
+	}
 	t := http.DefaultTransport.(*http.Transport).Clone()
 	t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} // #nosec G402 -- explicit opt-in via --insecure
 	c.httpClient.Transport = t
+}
+
+// SetTransport replaces the underlying HTTP round tripper (e.g. a proxy transport).
+func (c *ODataClient) SetTransport(rt http.RoundTripper) {
+	c.httpClient.Transport = rt
 }
 
 // SetSAPClient sets the SAP client sent with every request.

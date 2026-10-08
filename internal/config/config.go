@@ -70,11 +70,14 @@ type Config struct {
 	// Header forwarding (HTTP transport only)
 	ForwardMCPHeaders bool `mapstructure:"forward_mcp_headers"` // Forward HTTP headers from MCP connection to OData service
 
+	// TLS
+	Insecure bool `mapstructure:"insecure"` // Skip TLS certificate verification for the OData service (testing only)
+
 	// SAP
 	SAPClient string `mapstructure:"sap_client"` // SAP client (Mandant), sent as sap-client on every request
 
-	// TLS
-	Insecure bool `mapstructure:"insecure"` // Skip TLS certificate verification for the OData service (testing only)
+	// SAP BTP
+	BTPConnectivity bool `mapstructure:"btp_connectivity"` // Route OData traffic through the BTP connectivity proxy (Cloud Connector)
 
 	// Universal tool mode (single tool instead of N tools per entity)
 	UniversalTool bool `mapstructure:"universal"` // Use single universal OData tool instead of per-entity tools

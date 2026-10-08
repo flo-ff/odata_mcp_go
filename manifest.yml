@@ -1,0 +1,22 @@
+---
+# Cloud Foundry deployment (SAP BTP). Secrets are NOT stored here:
+#   cf set-env odata-mcp ODATA_MCP_TOKEN <secret>
+#   cf set-env odata-mcp ODATA_USERNAME <technical user>
+#   cf set-env odata-mcp ODATA_PASSWORD <password>
+applications:
+  - name: odata-mcp
+    memory: 128M
+    instances: 1
+    buildpacks:
+      - go_buildpack
+    health-check-type: http
+    health-check-http-endpoint: /health
+    env:
+      GOVERSION: go1.21
+      GO_INSTALL_PACKAGE_SPEC: ./cmd/odata-mcp
+      # Virtual host as configured in the Cloud Connector (plain http: the
+      # connectivity proxy tunnels to the Cloud Connector).
+      ODATA_SERVICE_URL: http://s4-virtual:8000/sap/opu/odata/sap/CHANGE_ME_SRV/
+    services:
+      - odata-mcp-connectivity
+    command: bin/odata-mcp --transport streamable-http --tls-terminated-upstream --btp-connectivity --read-only

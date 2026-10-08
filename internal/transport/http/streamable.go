@@ -26,7 +26,11 @@ type StreamableHTTPTransport struct {
 	activeStreams  map[string]*streamContext
 	enableSecurity bool
 	forwardHeaders bool // Whether to forward HTTP headers to OData client
+	auth           Authenticator
 }
+
+// SetAuthenticator installs request authentication; /health stays unauthenticated.
+func (t *StreamableHTTPTransport) SetAuthenticator(a Authenticator) { t.auth = a }
 
 type streamContext struct {
 	id       string
@@ -72,7 +76,7 @@ func (t *StreamableHTTPTransport) Start(ctx context.Context) error {
 
 	t.server = &http.Server{
 		Addr:    t.addr,
-		Handler: t.addSecurityHeaders(mux),
+		Handler: t.addSecurityHeaders(RequireAuth(mux, t.auth, "/health")),
 	}
 
 	// Start cleanup routine for stale streams
