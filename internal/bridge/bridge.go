@@ -6,6 +6,7 @@ package bridge
 import (
 	"context"
 	"fmt"
+	"github.com/zmcp/odata-mcp/internal/btp"
 	"os"
 	"sort"
 	"strings"
@@ -43,6 +44,28 @@ func NewODataMCPBridge(cfg *config.Config) (*ODataMCPBridge, error) {
 		odataClient.SetBasicAuth(cfg.Username, cfg.Password)
 	} else if cfg.HasCookieAuth() {
 		odataClient.SetCookies(cfg.Cookies)
+	}
+
+	if cfg.Insecure {
+		fmt.Fprintf(os.Stderr, "WARNING: --insecure set, TLS certificates of the OData service are NOT verified\n")
+		odataClient.SetInsecureSkipVerify()
+	}
+
+	// Route through the BTP connectivity proxy for on-premise systems
+	if cfg.BTPConnectivity {
+		b, err := btp.FromEnv()
+		if err != nil {
+			return nil, err
+		}
+		creds, ok := b.First("connectivity")
+		if !ok {
+			return nil, fmt.Errorf("--btp-connectivity set but no connectivity service is bound (VCAP_SERVICES)")
+		}
+		rt, err := btp.NewConnectivityTransport(creds)
+		if err != nil {
+			return nil, err
+		}
+		odataClient.SetTransport(rt)
 	}
 
 	// Create MCP server

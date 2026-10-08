@@ -109,6 +109,7 @@ func init() {
 	rootCmd.Flags().Bool("tls", false, "Enable TLS for HTTP transport (required for non-localhost)")
 	rootCmd.Flags().String("tls-cert", "", "Path to TLS certificate file")
 	rootCmd.Flags().String("tls-key", "", "Path to TLS private key file")
+	rootCmd.Flags().Bool("tls-terminated-upstream", false, "TLS is terminated by a trusted proxy in front of this process (e.g. Cloud Foundry gorouter); satisfies the TLS requirement for remote binding")
 	rootCmd.Flags().Bool("allow-all-interfaces", false, "Allow binding to all interfaces (0.0.0.0/::) - requires token and TLS")
 
 	// Debug options
@@ -130,6 +131,11 @@ func init() {
 
 	// Header forwarding (HTTP transport only)
 	rootCmd.Flags().BoolVar(&cfg.ForwardMCPHeaders, "forward-mcp-headers", false, "Forward HTTP headers from MCP connection to OData service (Streamable HTTP transport only)")
+
+	rootCmd.Flags().BoolVar(&cfg.Insecure, "insecure", false, "Skip TLS certificate verification when calling the OData service (INSECURE, testing only)")
+
+	// SAP BTP
+	rootCmd.Flags().BoolVar(&cfg.BTPConnectivity, "btp-connectivity", false, "Reach the OData service via the BTP connectivity proxy and Cloud Connector (requires a bound connectivity service; service URL must use the virtual host over http)")
 
 	// Universal tool mode (single tool instead of N tools per entity)
 	rootCmd.Flags().BoolVar(&cfg.UniversalTool, "universal", false, "Use single universal OData tool instead of per-entity tools (reduces token usage by 96-98%)")
@@ -309,7 +315,9 @@ func runBridge(cmd *cobra.Command, args []string) error {
 				fmt.Fprintf(os.Stderr, "[VERBOSE] Header forwarding enabled - HTTP headers will be passed to OData service\n")
 			}
 		}
-		trans = http.NewStreamableHTTP(securityCfg.Addr, handler, securityCfg.Token != "", cfg.ForwardMCPHeaders)
+		st := http.NewStreamableHTTP(securityCfg.Addr, handler, securityCfg.Token != "", cfg.ForwardMCPHeaders)
+		st.SetAuthenticator(http.StaticTokenAuthenticator{Token: securityCfg.Token})
+		trans = st
 	case "http", "sse":
 		securityCfg, err := buildSecurityConfig(cmd)
 		if err != nil {
@@ -323,7 +331,9 @@ func runBridge(cmd *cobra.Command, args []string) error {
 		if cfg.Verbose {
 			fmt.Fprintf(os.Stderr, "[VERBOSE] Starting HTTP/SSE transport on %s\n", securityCfg.Addr)
 		}
-		trans = http.NewSSE(securityCfg.Addr, handler)
+		sse := http.NewSSE(securityCfg.Addr, handler)
+		sse.SetAuthenticator(http.StaticTokenAuthenticator{Token: securityCfg.Token})
+		trans = sse
 
 	case "stdio":
 		fallthrough
@@ -367,6 +377,17 @@ func buildSecurityConfig(cmd *cobra.Command) (http.SecurityConfig, error) {
 	tlsCert, _ := cmd.Flags().GetString("tls-cert")
 	tlsKey, _ := cmd.Flags().GetString("tls-key")
 	allowAllInterfaces, _ := cmd.Flags().GetBool("allow-all-interfaces")
+	tlsUpstream, _ := cmd.Flags().GetBool("tls-terminated-upstream")
+
+	// Platform defaults: on Cloud Foundry the app must listen on $PORT, and the
+	// secret comes from the environment rather than the command line.
+	if port := os.Getenv("PORT"); port != "" && !cmd.Flags().Changed("http-addr") {
+		httpAddr = "0.0.0.0:" + port
+		allowAllInterfaces = true
+	}
+	if token == "" && tokenFile == "" {
+		token = os.Getenv("ODATA_MCP_TOKEN")
+	}
 
 	// Load token from file if specified
 	if tokenFile != "" && token == "" {
@@ -378,12 +399,13 @@ func buildSecurityConfig(cmd *cobra.Command) (http.SecurityConfig, error) {
 	}
 
 	return http.SecurityConfig{
-		Addr:               httpAddr,
-		Token:              token,
-		TLSEnabled:         tlsEnabled,
-		TLSCert:            tlsCert,
-		TLSKey:             tlsKey,
-		AllowAllInterfaces: allowAllInterfaces,
+		Addr:                  httpAddr,
+		Token:                 token,
+		TLSEnabled:            tlsEnabled,
+		TLSCert:               tlsCert,
+		TLSKey:                tlsKey,
+		AllowAllInterfaces:    allowAllInterfaces,
+		TLSTerminatedUpstream: tlsUpstream,
 	}, nil
 }
 

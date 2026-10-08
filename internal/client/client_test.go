@@ -1,6 +1,8 @@
 package client
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -154,4 +156,22 @@ func TestBuildKeyPredicateComposite(t *testing.T) {
 	if !strings.Contains(result, ",") {
 		t.Errorf("buildKeyPredicate should have comma separator, got: %v", result)
 	}
+}
+
+func TestInsecureSkipVerify(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
+	defer srv.Close()
+
+	strict := NewODataClient(srv.URL, false)
+	if _, err := strict.httpClient.Get(srv.URL); err == nil {
+		t.Fatal("expected certificate error without --insecure")
+	}
+
+	loose := NewODataClient(srv.URL, false)
+	loose.SetInsecureSkipVerify()
+	resp, err := loose.httpClient.Get(srv.URL)
+	if err != nil {
+		t.Fatalf("insecure client should accept self-signed cert: %v", err)
+	}
+	resp.Body.Close()
 }
