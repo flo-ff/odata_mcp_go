@@ -24,6 +24,17 @@ func (c *ODataClient) buildRequest(ctx context.Context, method, endpoint string,
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
+	// SAP client: query parameter is the canonical form, the header is a fallback.
+	// Appended raw so existing OData query encoding is left untouched.
+	if c.sapClient != "" {
+		if req.URL.RawQuery == "" {
+			req.URL.RawQuery = "sap-client=" + c.sapClient
+		} else {
+			req.URL.RawQuery += "&sap-client=" + c.sapClient
+		}
+		req.Header.Set("sap-client", c.sapClient)
+	}
+
 	// Set standard headers
 	req.Header.Set(constants.UserAgent, constants.DefaultUserAgent)
 	if c.isV4 {
