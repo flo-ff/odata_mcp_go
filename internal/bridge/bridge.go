@@ -45,6 +45,15 @@ func NewODataMCPBridge(cfg *config.Config) (*ODataMCPBridge, error) {
 		odataClient.SetCookies(cfg.Cookies)
 	}
 
+	if cfg.SAPClient != "" {
+		odataClient.SetSAPClient(cfg.SAPClient)
+	}
+
+	if cfg.Insecure {
+		fmt.Fprintf(os.Stderr, "WARNING: --insecure set, TLS certificates of the OData service are NOT verified\n")
+		odataClient.SetInsecureSkipVerify()
+	}
+
 	// Create MCP server
 	mcpServer := mcp.NewServer(constants.MCPServerName, constants.MCPServerVersion)
 

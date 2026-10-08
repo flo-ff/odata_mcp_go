@@ -4,6 +4,7 @@
 package client
 
 import (
+	"crypto/tls"
 	"net/http"
 	"strings"
 	"time"
@@ -26,6 +27,7 @@ type ODataClient struct {
 	csrfToken      string
 	verbose        bool
 	sessionCookies []*http.Cookie // Track session cookies from server
+	sapClient      string         // SAP client (Mandant); empty = system default
 	isV4           bool           // Whether the service is OData v4
 }
 
@@ -50,6 +52,18 @@ func NewODataClient(baseURL string, verbose bool) *ODataClient {
 func (c *ODataClient) SetBasicAuth(username, password string) {
 	c.username = username
 	c.password = password
+}
+
+// SetInsecureSkipVerify disables TLS certificate verification for outgoing requests.
+func (c *ODataClient) SetInsecureSkipVerify() {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} // #nosec G402 -- explicit opt-in via --insecure
+	c.httpClient.Transport = t
+}
+
+// SetSAPClient sets the SAP client sent with every request.
+func (c *ODataClient) SetSAPClient(client string) {
+	c.sapClient = client
 }
 
 // SetCookies configures cookie authentication
