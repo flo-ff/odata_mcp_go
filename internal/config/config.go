@@ -73,6 +73,9 @@ type Config struct {
 	// TLS
 	Insecure bool `mapstructure:"insecure"` // Skip TLS certificate verification for the OData service (testing only)
 
+	// SAP
+	SAPClient string `mapstructure:"sap_client"` // SAP client (Mandant), sent as sap-client on every request
+
 	// SAP BTP
 	BTPConnectivity bool `mapstructure:"btp_connectivity"` // Route OData traffic through the BTP connectivity proxy (Cloud Connector)
 

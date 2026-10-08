@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -174,4 +175,33 @@ func TestInsecureSkipVerify(t *testing.T) {
 		t.Fatalf("insecure client should accept self-signed cert: %v", err)
 	}
 	resp.Body.Close()
+}
+
+func TestSAPClientOnEveryRequest(t *testing.T) {
+	var gotQuery, gotHeader string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery, gotHeader = r.URL.RawQuery, r.Header.Get("sap-client")
+	}))
+	defer srv.Close()
+
+	c := NewODataClient(srv.URL, false)
+	c.SetSAPClient("100")
+
+	for _, tc := range []struct{ endpoint, wantQuery string }{
+		{"$metadata", "sap-client=100"},
+		{"A_BusinessPartner?$filter=Name%20eq%20%27x%27", "$filter=Name%20eq%20%27x%27&sap-client=100"},
+	} {
+		req, err := c.buildRequest(context.Background(), "GET", tc.endpoint, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if gotQuery != tc.wantQuery || gotHeader != "100" {
+			t.Fatalf("%s: query=%q header=%q", tc.endpoint, gotQuery, gotHeader)
+		}
+	}
 }

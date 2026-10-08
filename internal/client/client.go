@@ -27,6 +27,7 @@ type ODataClient struct {
 	csrfToken      string
 	verbose        bool
 	sessionCookies []*http.Cookie // Track session cookies from server
+	sapClient      string         // SAP client (Mandant); empty = system default
 	isV4           bool           // Whether the service is OData v4
 }
 
@@ -68,6 +69,11 @@ func (c *ODataClient) SetInsecureSkipVerify() {
 // SetTransport replaces the underlying HTTP round tripper (e.g. a proxy transport).
 func (c *ODataClient) SetTransport(rt http.RoundTripper) {
 	c.httpClient.Transport = rt
+}
+
+// SetSAPClient sets the SAP client sent with every request.
+func (c *ODataClient) SetSAPClient(client string) {
+	c.sapClient = client
 }
 
 // SetCookies configures cookie authentication

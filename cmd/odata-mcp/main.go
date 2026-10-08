@@ -132,6 +132,7 @@ func init() {
 	// Header forwarding (HTTP transport only)
 	rootCmd.Flags().BoolVar(&cfg.ForwardMCPHeaders, "forward-mcp-headers", false, "Forward HTTP headers from MCP connection to OData service (Streamable HTTP transport only)")
 
+	rootCmd.Flags().StringVar(&cfg.SAPClient, "sap-client", "", "SAP client (Mandant), e.g. 100; sent as sap-client query parameter and header (env: ODATA_SAP_CLIENT)")
 	rootCmd.Flags().BoolVar(&cfg.Insecure, "insecure", false, "Skip TLS certificate verification when calling the OData service (INSECURE, testing only)")
 
 	// SAP BTP
@@ -219,6 +220,13 @@ func runBridge(cmd *cobra.Command, args []string) error {
 
 	if cfg.ServiceURL == "" {
 		return fmt.Errorf("OData service URL not provided. Use --service flag, positional argument, or ODATA_URL environment variable")
+	}
+
+	if cfg.SAPClient == "" {
+		cfg.SAPClient = viper.GetString("SAP_CLIENT")
+	}
+	if cfg.SAPClient != "" && !validSAPClient(cfg.SAPClient) {
+		return fmt.Errorf("--sap-client must be 1-3 digits (got %q)", cfg.SAPClient)
 	}
 
 	// Validate and process authentication
@@ -631,4 +639,17 @@ func main() {
 		fmt.Fprintf(os.Stderr, "-------------------\n")
 		os.Exit(1)
 	}
+}
+
+// validSAPClient reports whether s is a valid SAP client number (1-3 digits).
+func validSAPClient(s string) bool {
+	if len(s) < 1 || len(s) > 3 {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
